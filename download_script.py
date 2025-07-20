@@ -122,7 +122,7 @@ if __name__ == "__main__":
         except requests.exceptions.RequestException as e:
             return {"list": []}
 
-    api_request_interval = 20
+    api_request_interval = 20   
     total_images_to_process = 5112
     delay_between_api_calls = 5
 
