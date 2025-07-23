@@ -6,7 +6,7 @@ import os
 from bs4 import BeautifulSoup
 import time
 
-DOWNLOAD_DIR = "datasets/hip_ct"
+DOWNLOAD_DIR = "datasets/hip_mri"
 ARTICLE_BASE_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/"
 RETRY_LIMIT = 5
 INITIAL_RETRY_DELAY = 2
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     import requests
 
     def get_img_json(query, m=1, n=10, vid=0):
-        url = f"https://openi.nlm.nih.gov/api/search?m={m}&n={n}&query={query}&vid={vid}"
+        url = f"https://openi.nlm.nih.gov/api/search?m={m}&n={n}&query={query}&vid={vid}&imgType=graphics"
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -123,14 +123,14 @@ if __name__ == "__main__":
             return {"list": []}
 
     api_request_interval = 20   
-    total_images_to_process = 3652
+    total_images_to_process = 3382
     delay_between_api_calls = 5
 
     for i in range(0, total_images_to_process, api_request_interval):
         m = i + 1
         n = i + api_request_interval
         # TODO: change query here ...
-        list_of_json_objects_batch = get_img_json("hip ct", m=m, n=n, vid=0)
+        list_of_json_objects_batch = get_img_json("hip mri", m=m, n=n, vid=0)
 
         if 'list' in list_of_json_objects_batch and list_of_json_objects_batch['list']:
             print(f"Processing {len(list_of_json_objects_batch['list'])} images ({m}-{n})")
