@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     for i in range(0, total_images_to_process, api_request_interval):
         m = i + 1
-        n = i + api_request_interval
+        n = i + api_request_interval    
 
         # change your search query here
         list_of_json_objects_batch = get_img_json("head mri", m=m, n=n, vid=0)
