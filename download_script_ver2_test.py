@@ -5,7 +5,7 @@ import json
 import os
 import time
 
-DOWNLOAD_DIR = "datasets/brain_xray_png"
+DOWNLOAD_DIR = "datasets/spine_xray_png"
 BASE_IMG_URL = "https://openi.nlm.nih.gov"
 RETRY_LIMIT = 5
 INITIAL_RETRY_DELAY = 2
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             return {"list": []}
 
     api_request_interval = 20   
-    total_images_to_process = 8201  # adjust as needed
+    total_images_to_process = 11641  # adjust as needed
     delay_between_api_calls = 5
 
     for i in range(0, total_images_to_process, api_request_interval):
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         n = i + api_request_interval
 
         # change your search query here
-        list_of_json_objects_batch = get_img_json("brain xray", m=m, n=n, vid=0)
+        list_of_json_objects_batch = get_img_json("spine xray", m=m, n=n, vid=0)
 
         if 'list' in list_of_json_objects_batch and list_of_json_objects_batch['list']:
             print(f"\nProcessing {len(list_of_json_objects_batch['list'])} images ({m}-{n})")
