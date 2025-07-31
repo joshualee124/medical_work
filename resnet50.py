@@ -15,18 +15,33 @@ class BrainDataset(Dataset):
         self.image_paths = []
         self.labels = []
 
+        print(f"Looking for datasets in: {os.path.abspath(root_dir)}")
+        
+        if not os.path.exists(root_dir):
+            print(f"ERROR: Directory {root_dir} does not exist!")
+            return
+
+        folders_found = []
         for folder in os.listdir(root_dir):
             folder_path = os.path.join(root_dir, folder)
+            folders_found.append(folder)
 
             # Only include folders ending with _png
             if os.path.isdir(folder_path) and folder.endswith("_png"):
+                print(f"Processing folder: {folder}")
                 label = 1 if folder.lower().startswith(("brain", "head", "spine", "orbit")) else 0
 
-                # Collect images
+                # Collect images from subfolders
                 images_in_folder = []
-                for img_file in os.listdir(folder_path):
-                    if img_file.lower().endswith((".png", ".jpg", ".jpeg")):
-                        images_in_folder.append(os.path.join(folder_path, img_file))
+                for subfolder in os.listdir(folder_path):
+                    subfolder_path = os.path.join(folder_path, subfolder)
+                    if os.path.isdir(subfolder_path):
+                        print(f"  Processing subfolder: {subfolder}")
+                        for img_file in os.listdir(subfolder_path):
+                            if img_file.lower().endswith((".png", ".jpg", ".jpeg")):
+                                images_in_folder.append(os.path.join(subfolder_path, img_file))
+                
+                print(f"  Found {len(images_in_folder)} images in {folder}")
                 
                 # Limit images per class if specified
                 if max_images_per_class and len(images_in_folder) > max_images_per_class:
@@ -35,6 +50,9 @@ class BrainDataset(Dataset):
                 
                 self.image_paths.extend(images_in_folder)
                 self.labels.extend([label] * len(images_in_folder))
+        
+        print(f"All folders found: {folders_found}")
+        print(f"Total images loaded: {len(self.image_paths)}")
 
     def __len__(self):
         return len(self.image_paths)
