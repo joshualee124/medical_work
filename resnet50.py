@@ -31,15 +31,11 @@ class BrainDataset(Dataset):
                 print(f"Processing folder: {folder}")
                 label = 1 if folder.lower().startswith(("brain", "head", "spine", "orbit")) else 0
 
-                # Collect images from subfolders
+                # Collect images
                 images_in_folder = []
-                for subfolder in os.listdir(folder_path):
-                    subfolder_path = os.path.join(folder_path, subfolder)
-                    if os.path.isdir(subfolder_path):
-                        print(f"  Processing subfolder: {subfolder}")
-                        for img_file in os.listdir(subfolder_path):
-                            if img_file.lower().endswith((".png", ".jpg", ".jpeg")):
-                                images_in_folder.append(os.path.join(subfolder_path, img_file))
+                for img_file in os.listdir(folder_path):
+                    if img_file.lower().endswith((".png", ".jpg", ".jpeg")):
+                        images_in_folder.append(os.path.join(folder_path, img_file))
                 
                 print(f"  Found {len(images_in_folder)} images in {folder}")
                 
