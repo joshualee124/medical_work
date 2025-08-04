@@ -29,13 +29,12 @@ class BrainDataset(Dataset):
             if os.path.isdir(folder_path):
                 # Assign label
                 label = 1 if folder.lower().startswith(("brain", "head", "spine", "orbit")) else 0
-
-                # Collect images
-                images_in_folder = [
-                    os.path.join(folder_path, img_file)
-                    for img_file in os.listdir(folder_path)
-                    if img_file.lower().endswith((".png", ".jpg", ".jpeg"))
-                ]
+    
+                images_in_folder = []
+                for root, _, files in os.walk(folder_path):
+                    for img_file in files:
+                        if img_file.lower().endswith((".png", ".jpg", ".jpeg")):
+                            images_in_folder.append(os.path.join(root, img_file))
 
                 print(f"  Found {len(images_in_folder)} images in {folder} (Label={label})")
 
@@ -44,6 +43,10 @@ class BrainDataset(Dataset):
 
         print(f"All folders found: {folders_found}")
         print(f"Total images loaded: {len(self.image_paths)}")
+
+        # ✅ Show count of label distribution
+        print(f"Total Label 1 images: {sum(1 for l in self.labels if l == 1)}")
+        print(f"Total Label 0 images: {sum(1 for l in self.labels if l == 0)}")
 
     def __len__(self):
         return len(self.image_paths)
@@ -151,7 +154,6 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
               f"Train Acc: {train_acc:.2f}% | "
               f"Val Acc: {val_acc:.2f}%")
 
-       
         wandb.log({
             "epoch": epoch+1,
             "train_loss": train_loss,
