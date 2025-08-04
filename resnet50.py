@@ -63,7 +63,7 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    wandb.init(project="brain_ct_classifier", config={
+    wandb.init(project="neurofinder_classifier", config={
         "epochs": num_epochs,
         "batch_size": batch_size,
         "learning_rate": lr,
