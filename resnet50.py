@@ -174,7 +174,7 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
             # Collect for metrics
             train_preds.extend(predicted.cpu().numpy())
             train_labels.extend(labels.cpu().detach().numpy())
-            train_scores.extend(torch.softmax(outputs, dim=1)[:, 1].cpu().numpy())
+            train_scores.extend(torch.softmax(outputs, dim=1)[:, 1].cpu().detach().numpy())
 
         train_acc = 100 * correct / total
         train_loss = running_loss / len(train_loader)
