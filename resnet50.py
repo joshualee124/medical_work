@@ -173,7 +173,7 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
             
             # Collect for metrics
             train_preds.extend(predicted.cpu().numpy())
-            train_labels.extend(labels.cpu().numpy())
+            train_labels.extend(labels.cpu().detach().numpy())
             train_scores.extend(torch.softmax(outputs, dim=1)[:, 1].cpu().numpy())
 
         train_acc = 100 * correct / total
@@ -202,7 +202,7 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
                 
                 # Collect for metrics
                 val_preds.extend(predicted.cpu().numpy())
-                val_labels.extend(labels.cpu().numpy())
+                val_labels.extend(labels.cpu().detach().numpy())
                 val_scores.extend(torch.softmax(outputs, dim=1)[:, 1].cpu().numpy())
 
         val_acc = 100 * val_correct / val_total
