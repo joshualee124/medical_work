@@ -3,14 +3,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, Subset
+from torch.nn.parallel import DataParallel
 from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.models as models
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score, balanced_accuracy_score
 import wandb 
 
+
 class BrainDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
+    def __init__(self, root_dir, transform=None):   
         self.root_dir = root_dir
         self.transform = transform
         self.image_paths = []
@@ -61,10 +64,41 @@ class BrainDataset(Dataset):
 
         return image, label
 
+def calculate_metrics(y_true, y_pred, y_scores=None):
+    """Calculate comprehensive metrics for binary classification"""
+    # Basic accuracy
+    accuracy = (y_true == y_pred).mean()
 
-def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, save_path="resnet50_ct_classifier.pth", val_split=0.2):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+    
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    
+    f1 = f1_score(y_true, y_pred)
+    
+    balanced_acc = balanced_accuracy_score(y_true, y_pred)
+
+    auc = 0
+    if y_scores is not None:
+        auc = roc_auc_score(y_true, y_scores)
+    
+    return {
+        'accuracy': accuracy,
+        'sensitivity': sensitivity,
+        'specificity': specificity,
+        'f1_score': f1,
+        'balanced_accuracy': balanced_acc,
+        'auc': auc,
+        'tp': tp, 'tn': tn, 'fp': fp, 'fn': fn
+    }
+
+#try increasing batch size 
+# is it using all 4 gpus?
+
+def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005, save_path="resnet50_ct_classifier.pth", val_split=0.2):
+    device = torch.device("cuda:0")
     print(f"Using device: {device}")
+    print(f"Number of GPUs: {torch.cuda.device_count()}")
 
     wandb.init(project="neurofinder_classifier", config={
         "epochs": num_epochs,
@@ -72,7 +106,8 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
         "learning_rate": lr,
         "architecture": "resnet50",
         "optimizer": "Adam",
-        "val_split": val_split
+        "val_split": val_split,
+        "gpus": torch.cuda.device_count()
     })
 
     # Transformations for ResNet50
@@ -82,8 +117,6 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
         transforms.RandomRotation(degrees=10),
         transforms.ColorJitter(brightness=0.1, contrast=0.1),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
     ])
 
     # Load dataset
@@ -106,8 +139,9 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
     model = models.resnet50(pretrained=True)
     model.fc = nn.Linear(model.fc.in_features, 2)
     model = model.to(device)
+    model = DataParallel(model)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()#maybe try binary cross entropy loss
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Training loop
@@ -116,6 +150,11 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
         running_loss = 0.0
         correct = 0
         total = 0
+        
+        # Collect predictions for metrics
+        train_preds = []
+        train_labels = []
+        train_scores = []
 
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
@@ -131,14 +170,28 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            
+            # Collect for metrics
+            train_preds.extend(predicted.cpu().numpy())
+            train_labels.extend(labels.cpu().numpy())
+            train_scores.extend(torch.softmax(outputs, dim=1)[:, 1].cpu().numpy())
 
         train_acc = 100 * correct / total
         train_loss = running_loss / len(train_loader)
+        
+        # Calculate training metrics
+        train_metrics = calculate_metrics(train_labels, train_preds, train_scores)
 
         # Validation
         model.eval()
         val_correct = 0
         val_total = 0
+        
+        # Collect validation predictions
+        val_preds = []
+        val_labels = []
+        val_scores = []
+        
         with torch.no_grad():
             for images, labels in val_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -146,19 +199,47 @@ def train_model(data_dir="datasets", num_epochs=10, batch_size=32, lr=0.0001, sa
                 _, predicted = torch.max(outputs.data, 1)
                 val_total += labels.size(0)
                 val_correct += (predicted == labels).sum().item()
+                
+                # Collect for metrics
+                val_preds.extend(predicted.cpu().numpy())
+                val_labels.extend(labels.cpu().numpy())
+                val_scores.extend(torch.softmax(outputs, dim=1)[:, 1].cpu().numpy())
 
         val_acc = 100 * val_correct / val_total
+        
+        # Calculate validation metrics
+        val_metrics = calculate_metrics(val_labels, val_preds, val_scores)
 
         print(f"Epoch [{epoch+1}/{num_epochs}] | "
               f"Train Loss: {train_loss:.4f} | "
               f"Train Acc: {train_acc:.2f}% | "
-              f"Val Acc: {val_acc:.2f}%")
+              f"Val Acc: {val_acc:.2f}% | "
+              f"Val F1: {val_metrics['f1_score']:.3f} | "
+              f"Val AUC: {val_metrics['auc']:.3f}")
 
+        # Log all metrics to wandb
         wandb.log({
             "epoch": epoch+1,
             "train_loss": train_loss,
             "train_accuracy": train_acc,
-            "val_accuracy": val_acc
+            "val_accuracy": val_acc,
+            # Training metrics
+            "train_sensitivity": train_metrics['sensitivity'],
+            "train_specificity": train_metrics['specificity'],
+            "train_f1_score": train_metrics['f1_score'],
+            "train_balanced_accuracy": train_metrics['balanced_accuracy'],
+            "train_auc": train_metrics['auc'],
+            # Validation metrics
+            "val_sensitivity": val_metrics['sensitivity'],
+            "val_specificity": val_metrics['specificity'],
+            "val_f1_score": val_metrics['f1_score'],
+            "val_balanced_accuracy": val_metrics['balanced_accuracy'],
+            "val_auc": val_metrics['auc'],
+            # Confusion matrix values
+            "val_tp": val_metrics['tp'],
+            "val_tn": val_metrics['tn'],
+            "val_fp": val_metrics['fp'],
+            "val_fn": val_metrics['fn']
         })
 
     # Save model locally
