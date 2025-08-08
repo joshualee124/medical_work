@@ -8,7 +8,8 @@ from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.models as models
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score, balanced_accuracy_score
+from sklearn.metrics import f1_score, roc_auc_score, balanced_accuracy_score
+from sklearn.utils import resample
 import wandb 
 
 
@@ -66,16 +67,24 @@ class BrainDataset(Dataset):
 
 def calculate_metrics(y_true, y_pred, y_scores=None):
     """Calculate comprehensive metrics for binary classification"""
+    import numpy as np
+    
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
     # Basic accuracy
     accuracy = (y_true == y_pred).mean()
-
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
     
+    # Calculate TP, TN, FP, FN manually for sensitivity/specificity
+    tp = np.sum((y_true == 1) & (y_pred == 1))
+    tn = np.sum((y_true == 0) & (y_pred == 0))
+    fp = np.sum((y_true == 0) & (y_pred == 1))
+    fn = np.sum((y_true == 1) & (y_pred == 0))
+    
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
     specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
     
     f1 = f1_score(y_true, y_pred)
-    
     balanced_acc = balanced_accuracy_score(y_true, y_pred)
 
     auc = 0
@@ -88,8 +97,7 @@ def calculate_metrics(y_true, y_pred, y_scores=None):
         'specificity': specificity,
         'f1_score': f1,
         'balanced_accuracy': balanced_acc,
-        'auc': auc,
-        'tp': tp, 'tn': tn, 'fp': fp, 'fn': fn
+        'auc': auc
     }
 
 #try increasing batch size 
@@ -234,12 +242,7 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
             "val_specificity": val_metrics['specificity'],
             "val_f1_score": val_metrics['f1_score'],
             "val_balanced_accuracy": val_metrics['balanced_accuracy'],
-            "val_auc": val_metrics['auc'],
-            # Confusion matrix values
-            "val_tp": val_metrics['tp'],
-            "val_tn": val_metrics['tn'],
-            "val_fp": val_metrics['fp'],
-            "val_fn": val_metrics['fn']
+            "val_auc": val_metrics['auc']
         })
 
     # Save model locally
