@@ -103,7 +103,7 @@ def calculate_metrics(y_true, y_pred, y_scores=None):
 #try increasing batch size 
 # is it using all 4 gpus?
 
-def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005, save_path="resnet50_ct_classifier.pth", val_split=0.2):
+def train_model(data_dir="datasets", num_epochs=1000, batch_size=1024, lr=0.0005, save_path="resnet50_ct_classifier.pth", val_split=0.2):
     device = torch.device("cuda:0")
     print(f"Using device: {device}")
     print(f"Number of GPUs: {torch.cuda.device_count()}")
