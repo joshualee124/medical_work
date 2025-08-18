@@ -91,13 +91,31 @@ def calculate_metrics(y_true, y_pred, y_scores=None):
     if y_scores is not None:
         auc = roc_auc_score(y_true, y_scores)
     
+    # Calculate high-confidence accuracy (above 80% for positive predictions)
+    high_conf_accuracy = 0
+    high_conf_count = 0
+    if y_scores is not None:
+        y_scores = np.array(y_scores)
+        # Find predictions with confidence > 80% for positive class (label=1)
+        # y_scores > 0.8 means >80% confidence it's a brain/neuro image
+        high_conf_mask = y_scores > 0.8
+        high_conf_indices = np.where(high_conf_mask)[0]
+        
+        if len(high_conf_indices) > 0:
+            high_conf_true = y_true[high_conf_indices]
+            high_conf_pred = y_pred[high_conf_indices]
+            high_conf_accuracy = (high_conf_true == high_conf_pred).mean()
+            high_conf_count = len(high_conf_indices)
+    
     return {
         'accuracy': accuracy,
         'sensitivity': sensitivity,
         'specificity': specificity,
         'f1_score': f1,
         'balanced_accuracy': balanced_acc,
-        'auc': auc
+        'auc': auc,
+        'high_conf_accuracy': high_conf_accuracy,
+        'high_conf_count': high_conf_count
     }
 
 #try increasing batch size 
@@ -138,8 +156,8 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
     train_dataset = Subset(full_dataset, train_idx)
     val_dataset = Subset(full_dataset, val_idx)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers = 32)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False,num_workers = 32)
 
     print(f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}")
 
@@ -223,7 +241,8 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
               f"Train Acc: {train_acc:.2f}% | "
               f"Val Acc: {val_acc:.2f}% | "
               f"Val F1: {val_metrics['f1_score']:.3f} | "
-              f"Val AUC: {val_metrics['auc']:.3f}")
+              f"Val AUC: {val_metrics['auc']:.3f} | "
+              f"Val High-Conf Acc: {val_metrics['high_conf_accuracy']:.3f} ({val_metrics['high_conf_count']} samples)")
 
         # Log all metrics to wandb
         wandb.log({
@@ -237,18 +256,27 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
             "train_f1_score": train_metrics['f1_score'],
             "train_balanced_accuracy": train_metrics['balanced_accuracy'],
             "train_auc": train_metrics['auc'],
+            "train_high_conf_accuracy": train_metrics['high_conf_accuracy'],
+            "train_high_conf_count": train_metrics['high_conf_count'],
             # Validation metrics
             "val_sensitivity": val_metrics['sensitivity'],
             "val_specificity": val_metrics['specificity'],
             "val_f1_score": val_metrics['f1_score'],
             "val_balanced_accuracy": val_metrics['balanced_accuracy'],
-            "val_auc": val_metrics['auc']
+            "val_auc": val_metrics['auc'],
+            "val_high_conf_accuracy": val_metrics['high_conf_accuracy'],
+            "val_high_conf_count": val_metrics['high_conf_count']
         })
 
-    # Save model locally
-    torch.save(model.state_dict(), save_path)
-    print(f"Model saved to {save_path}")
+        # Save model every 5 epochs
+        if (epoch + 1) % 5 == 0:
+            checkpoint_path = f"checkpoint_epoch_{epoch+1}.pth"
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"✅ Checkpoint saved: {checkpoint_path}")
 
+    # Save final model
+    torch.save(model.state_dict(), save_path)
+    print(f"✅ Final model saved to {save_path}")
     wandb.save(save_path)
 
 
