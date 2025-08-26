@@ -433,7 +433,7 @@ if __name__ == "__main__":
     parser.add_argument("--val_split", type=float, default=0.2)
     parser.add_argument("--checkpoints", default="checkpoint_epoch_*.pth",
                         help="Glob or single path to a .pth checkpoint.")
-    parser.add_argument("--out_dir", default="val_misclassified_550")
+    parser.add_argument("--out_dir", default="val_misclassified_10")
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--num_workers", type=int, default=8)
     parser.add_argument("--max_wrong", type=int, default=200,
