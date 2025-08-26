@@ -155,7 +155,8 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
 
     train_dataset = Subset(full_dataset, train_idx)
     val_dataset = Subset(full_dataset, val_idx)
-
+    
+    
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers = 32)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False,num_workers = 32)
 
@@ -279,6 +280,189 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
     print(f"✅ Final model saved to {save_path}")
     wandb.save(save_path)
 
+    
 
+    # =========================
+# Checkpoint evaluation (accuracy only + 200 wrong images)
+# =========================
+import csv, shutil
+from glob import glob
+
+def _build_eval_dataset(data_dir, val_split):
+    # Deterministic (no augmentation) eval transforms
+    eval_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
+    full_eval = BrainDataset(root_dir=data_dir, transform=eval_transform)
+
+    # Recreate the SAME split used in training
+    indices = list(range(len(full_eval)))
+    labels = full_eval.labels
+    _, val_idx_local = train_test_split(
+        indices, test_size=val_split, stratify=labels, random_state=42
+    )
+
+    val_subset = Subset(full_eval, val_idx_local)
+    return full_eval, val_subset, val_idx_local
+
+def _build_resnet50_head(num_classes=2):
+    m = models.resnet50(weights=None)  # weights don't matter; checkpoint will load real weights
+    in_f = m.fc.in_features
+    m.fc = nn.Linear(in_f, num_classes)
+    return m
+
+def _load_state_flex(model, state):
+    # Accept raw state_dict, {"state_dict": ...}, and DataParallel ("module.") keys
+    sd = state.get("state_dict", state) if isinstance(state, dict) else state
+    try:
+        model.load_state_dict(sd, strict=True)
+    except RuntimeError:
+        fixed = { (k[7:] if k.startswith("module.") else k): v for k, v in sd.items() }
+        model.load_state_dict(fixed, strict=True)
+    return model
+
+@torch.no_grad()
+def _eval_one_checkpoint(
+    ckpt_path, device, val_loader, val_image_paths, val_labels,
+    out_dir="val_misclassified_200", max_wrong=200
+):
+    os.makedirs(out_dir, exist_ok=True)
+
+    model = _build_resnet50_head(num_classes=2).to(device)
+    state = torch.load(ckpt_path, map_location=device)
+    _load_state_flex(model, state)
+    model.eval()
+
+    all_prob1, all_pred = [], []
+    for images, _ in val_loader:
+        images = images.to(device, non_blocking=True)
+        logits = model(images)
+        prob1 = torch.softmax(logits, dim=1)[:, 1]
+        preds = (prob1 >= 0.5).long()
+        all_prob1.append(prob1.detach().cpu().numpy())
+        all_pred.append(preds.detach().cpu().numpy())
+
+    import numpy as np
+    y_scores = np.concatenate(all_prob1)
+    y_pred = np.concatenate(all_pred)
+    val_labels_np = np.array(val_labels)
+
+    # Accuracy only
+    acc = (y_pred == val_labels_np).mean()
+    print(f"[VAL] {os.path.basename(ckpt_path)}  Accuracy: {acc:.4f}")
+
+    # Save exactly 200 misclassified images (val order)
+    mis_idx = np.where(y_pred != val_labels_np)[0]
+    take = mis_idx[:max_wrong]
+    manifest_path = os.path.join(out_dir, f"misclassified_{os.path.basename(ckpt_path)}.csv")
+
+    saved = 0
+    with open(manifest_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["orig_path", "saved_path", "true_label", "pred_label", "prob_class1"])
+        for k in take:
+            src = val_image_paths[k]
+            true_l = int(val_labels_np[k]); pred_l = int(y_pred[k]); p1 = float(y_scores[k])
+            new_name = f"WRONG_true{true_l}_pred{pred_l}_p1-{p1:.3f}__{os.path.basename(src)}"
+            dst = os.path.join(out_dir, new_name)
+            try:
+                shutil.copy2(src, dst)
+                w.writerow([src, dst, true_l, pred_l, p1])
+                saved += 1
+            except Exception:
+                pass
+
+    print(f"Saved {saved} misclassified images to: {out_dir}")
+    print(f"Manifest CSV: {manifest_path}")
+    return acc, saved, manifest_path
+
+def evaluate_checkpoints(
+    data_dir="datasets",
+    val_split=0.2,
+    checkpoints_glob="checkpoint_epoch_*.pth",
+    out_dir="val_misclassified_200",
+    batch_size=256,
+    num_workers=8,
+    max_wrong=200
+):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"[Eval] Using device: {device}")
+
+    full_eval, val_subset, val_idx_local = _build_eval_dataset(data_dir, val_split)
+
+    # DataLoader
+    val_loader = DataLoader(
+        val_subset, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=torch.cuda.is_available()
+    )
+
+    # Paths + labels in val order for saving copies
+    val_image_paths = [full_eval.image_paths[i] for i in val_idx_local]
+    val_labels = [full_eval.labels[i] for i in val_idx_local]
+
+    # Resolve checkpoints
+    paths = sorted(glob(checkpoints_glob))
+    if not paths and os.path.isfile(checkpoints_glob):
+        paths = [checkpoints_glob]
+
+    if not paths:
+        print(f"[Eval] No checkpoints matched: {checkpoints_glob}")
+        return
+
+    print(f"[Eval] Found {len(paths)} checkpoint(s):")
+    for p in paths:
+        print(" -", p)
+
+    # Evaluate each
+    for p in paths:
+        _eval_one_checkpoint(
+            p, device, val_loader, val_image_paths, val_labels,
+            out_dir=out_dir, max_wrong=max_wrong
+        )
+
+# =========================
+# Main
+# =========================
 if __name__ == "__main__":
-    train_model()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["train", "eval"], default="eval",
+                        help="train = run training loop, eval = only evaluate checkpoints (default).")
+    parser.add_argument("--data_dir", default="datasets")
+    parser.add_argument("--val_split", type=float, default=0.2)
+    parser.add_argument("--checkpoints", default="checkpoint_epoch_*.pth",
+                        help="Glob or single path to a .pth checkpoint.")
+    parser.add_argument("--out_dir", default="val_misclassified_200")
+    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--max_wrong", type=int, default=200,
+                        help="Exactly this many misclassified images will be attempted; if fewer exist, all will be saved.")
+
+    # (Optional) training hyperparams if you ever run --mode train
+    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--train_batch", type=int, default=512)
+    parser.add_argument("--lr", type=float, default=0.0005)
+    parser.add_argument("--save_path", default="resnet50_ct_classifier.pth")
+
+    args = parser.parse_args()
+
+    if args.mode == "train":
+        train_model(
+            data_dir=args.data_dir,
+            num_epochs=args.epochs,
+            batch_size=args.train_batch,
+            lr=args.lr,
+            save_path=args.save_path,
+            val_split=args.val_split
+        )
+    else:
+        evaluate_checkpoints(
+            data_dir=args.data_dir,
+            val_split=args.val_split,
+            checkpoints_glob=args.checkpoints,
+            out_dir=args.out_dir,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            max_wrong=args.max_wrong
+        )
