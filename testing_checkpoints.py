@@ -13,6 +13,7 @@ from sklearn.utils import resample
 import wandb 
 import numpy as np
 from torchvision.transforms import ToPILImage
+from collections import OrderedDict
 
 
 class BrainDataset(Dataset):
@@ -80,11 +81,33 @@ if __name__ == "__main__":
     val_dataset = Subset(full_dataset, val_idx)
     val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False,num_workers = 32)
     checkpoint_path = 'checkpoint_epoch_10.pth'
-    model = models.resnet50(pretrained=True)
+    model = models.resnet50(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    model.load_state_dict(torch.load(checkpoint_path))
-    model = nn.DataParallel(model)
-    model = model.to(device)
+
+    # load checkpoint safely
+    ckpt = torch.load("checkpoint_epoch_10.pth", map_location="cpu")
+
+    # some trainings save under 'state_dict'
+    state = ckpt.get("state_dict", ckpt)
+
+    # strip 'module.' if present
+    new_state = OrderedDict()
+    for k, v in state.items():
+        new_k = k.replace("module.", "", 1) if k.startswith("module.") else k
+        new_state[new_k] = v
+
+    # if classifier shape differs, drop it so your new fc stays
+    msd = model.state_dict()
+    for head_k in ["fc.weight", "fc.bias"]:
+        if head_k in new_state and new_state[head_k].shape != msd[head_k].shape:
+            new_state.pop(head_k)
+
+    # load (allow dropped head if needed)
+    model.load_state_dict(new_state, strict=False)
+
+    # now move to GPU(s)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = nn.DataParallel(model).to(device)
     model.eval()
     true1pred1_counter = 0
     false1pred1_counter = 0
