@@ -128,9 +128,9 @@ if __name__ == "__main__":
     os.makedirs("true1pred0", exist_ok=True)
 
     true1pred1_counter = 0
-    false1pred1_counter = 0
-    false1pred0_counter = 0
     true1pred0_counter = 0
+    true0pred0_counter = 0
+    true0pred1_counter = 0
     with torch.no_grad():
         for images, labels in val_loader:
             images, labels = images.to(device), labels.to(device)
@@ -141,20 +141,20 @@ if __name__ == "__main__":
                 img = to_pil(images[i].cpu())  # convert one image to PIL
                 y, p = int(labels[i].item()), int(preds[i].item())
 
-                if p == 1 and y == 1 and true1pred1_counter < 100:
+                if y == 1 and p == 1 and true1pred1_counter < 100:
                     img.save(f"true1pred1/pred_{true1pred1_counter}.png")
                     true1pred1_counter += 1
 
-                elif p == 1 and y == 0 and false1pred1_counter < 100:
-                    img.save(f"false1pred1/pred_{false1pred1_counter}.png")
+                elif y == 1 and p == 0 and true1pred0_counter < 100:
+                    img.save(f"true1pred0/pred_{true1pred0_counter}.png")
                     false1pred1_counter += 1
 
-                elif p == 0 and y == 1 and false1pred0_counter < 100:
-                    img.save(f"false1pred0/pred_{false1pred0_counter}.png")
+                elif y == 0 and p == 0 and true0pred0_counter < 100:
+                    img.save(f"true0pred0/pred_{true0pred0_counter}.png")
                     false1pred0_counter += 1
 
-                elif p == 0 and y == 0 and true1pred0_counter < 100:
-                    img.save(f"true1pred0/pred_{true1pred0_counter}.png")
+                elif y == 0 and p == 1 and true0pred1_counter < 100:
+                    img.save(f"true0pred1/pred_{true0pred1_counter}.png")
                     true1pred0_counter += 1
 
             # early exit once you hit 100 in each bucket
