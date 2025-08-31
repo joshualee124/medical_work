@@ -67,6 +67,7 @@ class BrainDataset(Dataset):
 
         if self.transform:
             image2 = self.transform(image)
+            image = transforms.ToTensor()(image)
 
         return image,image2,label
     
@@ -77,6 +78,7 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225))
     ])
+
     full_dataset = BrainDataset(root_dir='datasets', transform=transform)
 
     # Stratified split
