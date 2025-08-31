@@ -153,12 +153,8 @@ def train_model(data_dir="datasets", num_epochs=1000, batch_size=512, lr=0.0005,
 
     train_dataset = Subset(full_dataset, train_idx)
     val_dataset = Subset(full_dataset, val_idx)
-    #save val_dataset locally as a folder called val_dataset
-    os.makedirs("val_dataset", exist_ok=True)
-    for i, (image, label) in enumerate(val_dataset):
-        image.save(f"val_dataset/image_{i}.png")
-        label.save(f"val_dataset/label_{i}.png")
-
+    #save val_dataset locally as a folder called val_dataset, save labels as a json file
+    #save train dataset locally as a folder called train_dataset
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers = 32)
