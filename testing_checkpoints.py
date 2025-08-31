@@ -123,9 +123,9 @@ if __name__ == "__main__":
 
     # make sure output dirs exist
     os.makedirs("true1pred1", exist_ok=True)
-    os.makedirs("false1pred1", exist_ok=True)
-    os.makedirs("false1pred0", exist_ok=True)
     os.makedirs("true1pred0", exist_ok=True)
+    os.makedirs("true0pred0", exist_ok=True)
+    os.makedirs("true0pred1", exist_ok=True)
 
     true1pred1_counter = 0
     true1pred0_counter = 0
