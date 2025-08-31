@@ -124,8 +124,8 @@ if __name__ == "__main__":
     # make sure output dirs exist
     os.makedirs("true1pred1", exist_ok=True)
     os.makedirs("true1pred0", exist_ok=True)
-    os.makedirs("true0pred0", exist_ok=True)
-    os.makedirs("true0pred1", exist_ok=True)
+    os.makedirs("false1pred0", exist_ok=True)
+    os.makedirs("true1pred0", exist_ok=True)
 
     true1pred1_counter = 0
     true1pred0_counter = 0
@@ -147,20 +147,20 @@ if __name__ == "__main__":
 
                 elif y == 1 and p == 0 and true1pred0_counter < 100:
                     img.save(f"true1pred0/pred_{true1pred0_counter}.png")
-                    false1pred1_counter += 1
+                    true1pred0_counter += 1
 
                 elif y == 0 and p == 0 and true0pred0_counter < 100:
                     img.save(f"true0pred0/pred_{true0pred0_counter}.png")
-                    false1pred0_counter += 1
+                    true0pred0_counter += 1
 
                 elif y == 0 and p == 1 and true0pred1_counter < 100:
                     img.save(f"true0pred1/pred_{true0pred1_counter}.png")
-                    true1pred0_counter += 1
+                    true0pred1_counter += 1
 
-            # early exit once you hit 100 in each bucket
-            if (true1pred1_counter >= 100 and false1pred1_counter >= 100 and
-                false1pred0_counter >= 100 and true1pred0_counter >= 100):
-                break
+                # early exit once you hit 100 in each bucket
+                if (true1pred1_counter >= 100 and true1pred0_counter >= 100 and
+                    true0pred0_counter >= 100 and true0pred1_counter >= 100):
+                    break
 
 
 
