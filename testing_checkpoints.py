@@ -17,6 +17,7 @@ from collections import OrderedDict
 import torchvision.transforms as transforms
 
 
+
 class BrainDataset(Dataset):
     def __init__(self, root_dir, transform=None):   
         self.root_dir = root_dir
@@ -65,9 +66,9 @@ class BrainDataset(Dataset):
         label = self.labels[idx]
 
         if self.transform:
-            image = self.transform(image)
+            image2 = self.transform(image)
 
-        return image, label
+        return image,image2,label
     
 if __name__ == "__main__":
     device = torch.device("cuda:0")
@@ -132,9 +133,9 @@ if __name__ == "__main__":
     true0pred0_counter = 0
     true0pred1_counter = 0
     with torch.no_grad():
-        for images, labels in val_loader:
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
+        for images, images2, labels in val_loader:
+            images, images2, labels = images.to(device), images2.to(device), labels.to(device)
+            outputs = model(images2)
             preds = outputs.argmax(dim=1)   # [batch]
 
             for i in range(len(labels)):
