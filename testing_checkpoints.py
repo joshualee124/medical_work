@@ -67,6 +67,7 @@ class BrainDataset(Dataset):
 
         if self.transform:
             image2 = self.transform(image)
+            image = transforms.Resize((224, 224))(image)
             image = transforms.ToTensor()(image)
 
         return image,image2,label
