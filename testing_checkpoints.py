@@ -90,21 +90,29 @@ if __name__ == "__main__":
     train_dataset = Subset(full_dataset, train_idx)
     val_dataset = Subset(full_dataset, val_idx)
     val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False,num_workers = 32)
+    train_loader = DataLoader(train_dataset, batch_size=256, shuffle=False,num_workers = 32)
     checkpoint_path = 'checkpoint_epoch_10.pth'
+    train_checkpoint_path = 'checkpoint_epoch_605.pth'
     model = models.resnet50(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 2)
 
     # load checkpoint safely
     ckpt = torch.load("checkpoint_epoch_10.pth", map_location="cpu")
+    train_ckpt = torch.load(train_checkpoint_path, map_location="cpu")
 
-    # some trainings save under 'state_dict'
+    # some trainings save under 'state_dict'    
     state = ckpt.get("state_dict", ckpt)
-
+    train_state = train_ckpt.get("state_dict", train_ckpt)
+    new_state_train = OrderedDict()
+    for k, v in train_state.items():
+        new_k = k.replace("module.", "", 1) if k.startswith("module.") else k
+        new_state_train[new_k] = v
     # strip 'module.' if present
     new_state = OrderedDict()
     for k, v in state.items():
         new_k = k.replace("module.", "", 1) if k.startswith("module.") else k
         new_state[new_k] = v
+    model.load_state_dict(new_state, strict=False)
 
     # if classifier shape differs, drop it so your new fc stays
     msd = model.state_dict()
@@ -114,9 +122,46 @@ if __name__ == "__main__":
 
     # load (allow dropped head if needed)
     model.load_state_dict(new_state, strict=False)
+    model.to(device)
+    model.eval()
+    true1pred1_counter = 0
+    false1pred1_counter = 0
+    false1pred0_counter = 0
+    true1pred0_counter = 0
+    to_pil = ToPILImage()
+    os.makedirs("true1pred1train", exist_ok=True)
+    os.makedirs("true1pred0train", exist_ok=True)
+    os.makedirs("false1pred0train", exist_ok=True)
+    os.makedirs("true1pred0train", exist_ok=True)
+    true1pred1train_counter = 0
+    true1pred0train_counter = 0
+    true0pred0train_counter = 0
+    true0pred1train_counter = 0
+    with torch.no_grad():
+        for images, images2, labels in train_loader:
+            images, images2, labels = images.to(device), images2.to(device), labels.to(device)
+            outputs = model(images2)
+            preds = outputs.argmax(dim=1)   # [batch]
+            for i in range(len(labels)):
+                img = to_pil(images[i].cpu())  # convert one image to PIL
+                y, p = int(labels[i].item()), int(preds[i].item())
+                if y == 1 and p == 1 and true1pred1train_counter < 100:
+                    img.save(f"true1pred1train/pred_{true1pred1_counter}.png")
+                    true1pred1_counter += 1
+                elif y == 1 and p == 0 and true1pred0train_counter < 100:
+                    img.save(f"true1pred0train/pred_{true1pred0_counter}.png")
+                    true1pred0_counter += 1
+                elif y == 0 and p == 0 and true0pred0train_counter < 100:
+                    img.save(f"true0pred0train/pred_{true0pred0_counter}.png")
+                    true0pred0_counter += 1
+                elif y == 0 and p == 1 and true0pred1train_counter < 100:
+                    img.save(f"true0pred1train/pred_{true0pred1_counter}.png")
+                    true0pred1_counter += 1
+                if (true1pred1_counter >= 100 and true1pred0_counter >= 100 and true0pred0_counter >= 100 and true0pred1_counter >= 100):
+                    break
 
     # now move to GPU(s)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    """device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = nn.DataParallel(model).to(device)
     model.eval()
     true1pred1_counter = 0
@@ -170,5 +215,5 @@ if __name__ == "__main__":
 
 
 
-        #save 400 images, 100 images where predicted is 1 and 100 images where predicted is 0
+        #save 400 images, 100 images where predicted is 1 and 100 images where predicted is 0"""
         
