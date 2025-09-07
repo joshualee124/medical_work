@@ -117,11 +117,11 @@ if __name__ == "__main__":
     # if classifier shape differs, drop it so your new fc stays
     msd = model.state_dict()
     for head_k in ["fc.weight", "fc.bias"]:
-        if head_k in new_state and new_state[head_k].shape != msd[head_k].shape:
-            new_state.pop(head_k)
+        if head_k in new_state_train and new_state_train[head_k].shape != msd[head_k].shape:
+            new_state_train.pop(head_k)
 
     # load (allow dropped head if needed)
-    model.load_state_dict(new_state, strict=False)
+    model.load_state_dict(new_state_train, strict=False)
     model.to(device)
     model.eval()
     true1pred1_counter = 0
