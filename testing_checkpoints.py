@@ -127,7 +127,7 @@ if __name__ == "__main__":
     to_pil = ToPILImage()
     os.makedirs("true1pred1train", exist_ok=True)
     os.makedirs("true1pred0train", exist_ok=True)
-    os.makedirs("false1pred0train", exist_ok=True)
+    os.makedirs("true0pred1train", exist_ok=True)
     os.makedirs("true1pred0train", exist_ok=True)
     true1pred1train_counter = 0
     true1pred0train_counter = 0
