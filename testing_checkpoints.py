@@ -124,10 +124,6 @@ if __name__ == "__main__":
     model.load_state_dict(new_state_train, strict=False)
     model.to(device)
     model.eval()
-    true1pred1_counter = 0
-    false1pred1_counter = 0
-    false1pred0_counter = 0
-    true1pred0_counter = 0
     to_pil = ToPILImage()
     os.makedirs("true1pred1train", exist_ok=True)
     os.makedirs("true1pred0train", exist_ok=True)
@@ -146,18 +142,18 @@ if __name__ == "__main__":
                 img = to_pil(images[i].cpu())  # convert one image to PIL
                 y, p = int(labels[i].item()), int(preds[i].item())
                 if y == 1 and p == 1 and true1pred1train_counter < 100:
-                    img.save(f"true1pred1train/pred_{true1pred1_counter}.png")
-                    true1pred1_counter += 1
+                    img.save(f"true1pred1train/pred_{true1pred1train_counter}.png")
+                    true1pred1train_counter += 1
                 elif y == 1 and p == 0 and true1pred0train_counter < 100:
-                    img.save(f"true1pred0train/pred_{true1pred0_counter}.png")
-                    true1pred0_counter += 1
+                    img.save(f"true1pred0train/pred_{true1pred0train_counter}.png")
+                    true1pred0train_counter += 1
                 elif y == 0 and p == 0 and true0pred0train_counter < 100:
-                    img.save(f"true0pred0train/pred_{true0pred0_counter}.png")
-                    true0pred0_counter += 1
+                    img.save(f"true0pred0train/pred_{true0pred0train_counter}.png")
+                    true0pred0train_counter += 1
                 elif y == 0 and p == 1 and true0pred1train_counter < 100:
-                    img.save(f"true0pred1train/pred_{true0pred1_counter}.png")
-                    true0pred1_counter += 1
-                if (true1pred1_counter >= 100 and true1pred0_counter >= 100 and true0pred0_counter >= 100 and true0pred1_counter >= 100):
+                    img.save(f"true0pred1train/pred_{true0pred1train_counter}.png")
+                    true0pred1train_counter += 1
+                if (true1pred1train_counter >= 100 and true1pred0train_counter >= 100 and true0pred0train_counter >= 100 and true0pred1train_counter >= 100):
                     break
 
     # now move to GPU(s)
