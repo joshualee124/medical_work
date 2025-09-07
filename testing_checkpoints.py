@@ -91,28 +91,28 @@ if __name__ == "__main__":
     val_dataset = Subset(full_dataset, val_idx)
     val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False,num_workers = 32)
     train_loader = DataLoader(train_dataset, batch_size=256, shuffle=False,num_workers = 32)
-    checkpoint_path = 'checkpoint_epoch_10.pth'
+    #checkpoint_path = 'checkpoint_epoch_10.pth'
     train_checkpoint_path = 'checkpoint_epoch_605.pth'
     model = models.resnet50(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 2)
 
     # load checkpoint safely
-    ckpt = torch.load("checkpoint_epoch_10.pth", map_location="cpu")
-    train_ckpt = torch.load(train_checkpoint_path, map_location="cpu")
+    #ckpt = torch.load("checkpoint_epoch_10.pth", map_location="cpu")
+    train_ckpt = torch.load("checkpoint_epoch_605.pth", map_location="cpu")
 
     # some trainings save under 'state_dict'    
-    state = ckpt.get("state_dict", ckpt)
+    #state = ckpt.get("state_dict", ckpt)
     train_state = train_ckpt.get("state_dict", train_ckpt)
     new_state_train = OrderedDict()
     for k, v in train_state.items():
         new_k = k.replace("module.", "", 1) if k.startswith("module.") else k
         new_state_train[new_k] = v
     # strip 'module.' if present
-    new_state = OrderedDict()
-    for k, v in state.items():
-        new_k = k.replace("module.", "", 1) if k.startswith("module.") else k
-        new_state[new_k] = v
-    model.load_state_dict(new_state, strict=False)
+   # new_state = OrderedDict()
+   # for k, v in state.items():
+    #    new_k = k.replace("module.", "", 1) if k.startswith("module.") else k
+    #    new_state[new_k] = v
+    model.load_state_dict(new_state_train, strict=False)
 
     # if classifier shape differs, drop it so your new fc stays
     msd = model.state_dict()
